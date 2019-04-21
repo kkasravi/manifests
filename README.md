@@ -161,10 +161,94 @@ Outputs from kfctl (no platform specified):
 - do not set namespace in the resources, this should be done by a higher level target
 
 
-### Bridging kustomize and ksonnet
+### Converting ksonnet to kustomize 
 
-Equivalent to parameters in ksonnet, kustomize has vars. But the customizable objects are limited to [this list](https://github.com/kubernetes-sigs/kustomize/blob/master/pkg/transformers/config/defaultconfig/varreference.go)
+This section shows how one would convert tf-job-operator in ksonnet to kustomize.
+First, we'll need to create the appropriate directory structure under manifests.
+We'll assume your working in your fork of manifests and have this repo checked out 
+under a branch that will become a PR for tf-job-operator.
+```
+cd <manifests>
+mkdir -p tf-training/tf-job-operator/base
+cd tf-training/tf-job-operator/base
+cat <<'EOF' >kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+commonLabels:
+  kustomize.component: tf-job-operator
+images:
+EOF
+```
 
+1. Generate the ksonnet output using kfctl
+  - `kfctl init ~/example`
+  - `cd ~/example`
+  - `kfctl generate all`
+1. Generate the tf-job-operator yaml using the ksonnet CLI
+  - `cd ksonnet`
+  - `ks show default -c tf-job-operator > tf-job-operator.yaml`
+1. Section the tf-job-operator.yaml into 'kinds' where each kind is in its own file. In this case we'll end up with the following files under tf-training/tf-job-operator/base
+  - 
+1. Look at the parameters in [tf-job-operator.jsonnet](https://github.com/kubeflow/kubeflow/blob/master/kubeflow/tf-training/prototypes/tf-job-operator.jsonnet) and locate where they were used in [tf-job-operator.libsonnet](https://github.com/kubeflow/kubeflow/blob/master/kubeflow/tf-training/tf-job-operator.libsonnet) and where they were resolved in the yaml output.
+1. In this case we'll look at following parameters (name=value) to resolve in kustomize
+  - tfJobImage=gcr.io/kubeflow-images-public/tf_operator:v0.5.0
+  - tfDefaultImage=null
+  - tfJobUiServiceType=ClusterIP
+  - deploymentScope=cluster
+  - deploymentNamespace=null
+  - enableGangScheduling=false
+1. **tfJobImage=gcr.io/kubeflow-images-public/tf_operator:v0.5.0**
+  The tfJobImage parameter appears in tf-job-operator.libsonnet in the tfJobContainer
+```
+      image: params.tfJobImage,
+      name: "tf-job-operator",
+      volumeMounts: [
+        {
+          mountPath: "/etc/config",
+          name: "config-volume",
+        },
+      ],
+    },
+    tfJobContainer:: tfJobContainer,
+```
+  kustomize handles images via the `images:` stanza. Change the images section in kustomization.yaml to look like the following:
+```
+images:
+  - name: gcr.io/kubeflow-images-public/tf_operator
+    newName: gcr.io/kubeflow-images-public/tf_operator
+    newTag: v0.5.0
+```
+
+1. 
+  The tfDefaultImage parameter appears in tf-job-operator.libsonnet in the tfConfigMap
+```
+    local tfConfigMap = {
+      apiVersion: "v1",
+      data: {
+        "controller_config_file.yaml": std.manifestJson({
+          grpcServerFilePath: "/opt/mlkube/grpc_tensorflow_server/grpc_tensorflow_server.py",
+        } + if params.tfDefaultImage != "" &&
+               params.tfDefaultImage != "null" then {
+          tfImage: params.tfDefaultImage,
+        } else {},),
+      },
+      kind: "ConfigMap",
+      metadata: {
+        name: "tf-job-operator-config",
+        namespace: params.namespace,
+      },
+    },
+    tfConfigMap:: tfConfigMap,
+```
+  In this case we provide a kustomize var variable of tfDefaultImage. We first create a params.env with the entry 
+```
+tfDefaultImage=tfImage: 
+
+
+
+Equivalent to parameters in ksonnet, kustomize has vars. Converting parameters to vars can be done 
+in the following way, using tf-job-operator as an example
 ### Installing to a custom namespace
 
 For example, to install in `kubeflow-dev`. From the root of the repo run:

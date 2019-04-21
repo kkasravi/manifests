@@ -8,5 +8,26 @@ resources:
 - deployment.yaml
 - service-account.yaml
 - service.yaml
+namePrefix: tf-job-
 commonLabels:
   kustomize.component: tf-job-operator
+  name: tf-job-dashboard
+images:
+  - name: gcr.io/kubeflow-images-public/tf_operator
+    newName: gcr.io/kubeflow-images-public/tf_operator
+    newTag: v0.5.0
+configMapGenerator:
+- name: parameters
+  env: params.env
+generatorOptions:
+  disableNameSuffixHash: true
+vars:
+- name: tfJobUiServiceType
+  objref:
+    kind: ConfigMap
+    name: parameters
+    apiVersion: v1
+  fieldref:
+    fieldpath: data.tfJobUiServiceType
+configurations:
+- params.yaml

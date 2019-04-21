@@ -10,11 +10,9 @@ metadata:
       prefix: /tfjobs/
       rewrite: /tfjobs/
       service: tf-job-dashboard.kubeflow
-  name: tf-job-dashboard
+  name: dashboard
 spec:
   ports:
   - port: 80
     targetPort: 8080
-  selector:
-    name: tf-job-dashboard
-  type: ClusterIP
+  type: $(tfJobUiServiceType)
