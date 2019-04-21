@@ -1,0 +1,23 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: gcp-cred-webhook
+spec:
+  template:
+    metadata:
+      labels:
+        app: gcp-cred-webhook
+    spec:
+      containers:
+      - image: gcr.io/kubeflow-images-public/admission-webhook:v20190419-v0-47-g08da905d-e3b0c4
+        imagePullPolicy: Always
+        name: gcp-cred-webhook
+        volumeMounts:
+        - mountPath: /etc/webhook/certs
+          name: webhook-cert
+          readOnly: true
+      serviceAccountName: webhook
+      volumes:
+      - name: webhook-cert
+        secret:
+          secretName: gcp-cred-webhook-certs
