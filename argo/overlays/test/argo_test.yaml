@@ -1,0 +1,30 @@
+apiVersion: kfdef.apps.kubeflow.org/v1alpha1
+kind: KfDef
+metadata:
+  creationTimestamp: null
+  name: dls-kf
+  namespace: dls-kf
+spec:
+  appdir: /Users/kdkasrav/dls-kf
+  componentParams:
+    argo:
+    - name: overlay
+      value: istio
+  components:
+  - argo
+  email: kam.d.kasravi@intel.com
+  hostname: dls-kf.endpoints.constant-cubist-173123.cloud.goog
+  ipName: dls-kf-ip
+  manifestsRepo: /Users/kdkasrav/dls-kf/.cache/manifests/pull/102/head
+  packageManager: kustomize@pull/102
+  packages:
+  - argo
+  platform: gcp
+  project: constant-cubist-173123
+  repo: /Users/kdkasrav/dls-kf/.cache/kubeflow/pull/3375/head/kubeflow
+  serverVersion: file:/Users/kdkasrav/dls-kf/.cache/kubeflow/pull/3375/head/bootstrap/k8sSpec/v1.11.7/api/openapi-spec/swagger.json
+  useBasicAuth: false
+  useIstio: true
+  version: pull/3375
+  zone: us-west1-a
+status: {}
