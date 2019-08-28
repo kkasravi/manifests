@@ -28,6 +28,10 @@ varReference:
       name: kfctl-e2e
     resources:
       inputs:
+      - name: docker-source
+        resource: source-repo
+        from:
+        - kfctl-build-push
       - name: image
         resource: web-image
         from:
