@@ -1,0 +1,728 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  labels:
+    BUILD_ID: $(BUILD_ID)
+    BUILD_NUMBER: $(BUILD_NUMBER)
+    JOB_NAME: notset
+    JOB_TYPE: notset
+    PULL_NUMBER: notset
+    REPO_NAME: notset
+    REPO_OWNER: notset
+    workflow: somefakename
+    workflow_template: kctl_test
+  name: somefakename
+spec:
+  entrypoint: e2e
+  onExit: exit-handler
+  templates:
+  - dag:
+      tasks:
+      - name: checkout
+        template: checkout
+      - dependencies:
+        - checkout
+        name: create-pr-symlink
+        template: create-pr-symlink
+      - dependencies:
+        - checkout
+        name: kfctl-build-deploy
+        template: kfctl-build-deploy
+      - dependencies:
+        - kfctl-build-deploy
+        name: kfctl-is-ready
+        template: kfctl-is-ready
+      - dependencies:
+        - kfctl-is-ready
+        name: gke-tests
+        template: gke-tests
+    name: e2e
+  - dag:
+      tasks:
+      - name: kfctl-delete
+        template: kfctl-delete
+      - dependencies:
+        - kfctl-delete
+        name: copy-artifacts
+        template: copy-artifacts
+      - dependencies:
+        - copy-artifacts
+        name: test-dir-delete
+        template: test-dir-delete
+    name: exit-handler
+  - activeDeadlineSeconds: 3000
+    container:
+      command:
+      - /usr/local/bin/checkout.sh
+      - /mnt/test-data-volume/somefakename/src
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GOPATH
+        value: /mnt/test-data-volume/somefakename
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      - name: EXTRA_REPOS
+        value: kubeflow/kubeflow@HEAD;kubeflow/tf-operator@HEAD;kubeflow/testing@HEAD
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 1.5Gi
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+    metadata:
+      labels:
+        BUILD_ID: notset
+        BUILD_NUMBER: notset
+        JOB_NAME: notset
+        JOB_TYPE: notset
+        PULL_NUMBER: notset
+        REPO_NAME: notset
+        REPO_OWNER: notset
+        step_name: checkout
+        workflow: somefakename
+        workflow_template: kctl_test
+    name: checkout
+  - activeDeadlineSeconds: 3000
+    container:
+      command:
+      - python
+      - -m
+      - kubeflow.testing.prow_artifacts
+      - --artifacts_dir=/mnt/test-data-volume/somefakename/output
+      - create_pr_symlink
+      - --bucket=kubeflow-ci_temp
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GOPATH
+        value: /mnt/test-data-volume/somefakename
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 1.5Gi
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+    metadata:
+      labels:
+        BUILD_ID: notset
+        BUILD_NUMBER: notset
+        JOB_NAME: notset
+        JOB_TYPE: notset
+        PULL_NUMBER: notset
+        REPO_NAME: notset
+        REPO_OWNER: notset
+        step_name: create-pr-symlink
+        workflow: somefakename
+        workflow_template: kctl_test
+    name: create-pr-symlink
+  - activeDeadlineSeconds: 3000
+    container:
+      command:
+      - pytest
+      - kfctl_go_test.py
+      - -s
+      - --use_basic_auth=false
+      - --use_istio=true
+      - --config_path=/mnt/test-data-volume/somefakename/src/kubeflow/kubeflow/bootstrap/config/kfctl_gcp_iap.yaml
+      - --log-cli-level=info
+      - --junitxml=/mnt/test-data-volume/somefakename/output/artifacts/junit_kfctl-build-testiap-istio.xml
+      - -o
+      - junit_suite_name=test_kfctl_go_deploy_iap-istio
+      - --app_path=/mnt/test-data-volume/somefakename/kfctl-name
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GOPATH
+        value: /mnt/test-data-volume/somefakename
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 1.5Gi
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+      workingDir: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow/testing/kfctl
+    metadata:
+      labels:
+        BUILD_ID: notset
+        BUILD_NUMBER: notset
+        JOB_NAME: notset
+        JOB_TYPE: notset
+        PULL_NUMBER: notset
+        REPO_NAME: notset
+        REPO_OWNER: notset
+        step_name: kfctl-build-deploy
+        workflow: somefakename
+        workflow_template: kctl_test
+    name: kfctl-build-deploy
+    workingDir: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow/testing/kfctl
+  - activeDeadlineSeconds: 3000
+    container:
+      command:
+      - pytest
+      - kf_is_ready_test.py
+      - -s
+      - --use_basic_auth=false
+      - --use_istio=true
+      - --log-cli-level=info
+      - --junitxml=/mnt/test-data-volume/somefakename/output/artifacts/junit_kfctl-is-ready-test-iap-istio.xml
+      - -o
+      - junit_suite_name=test_kf_is_ready_iap-istio
+      - --app_path=/mnt/test-data-volume/somefakename/kfctl-name
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GOPATH
+        value: /mnt/test-data-volume/somefakename
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 1.5Gi
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+      workingDir: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow/testing/kfctl
+    metadata:
+      labels:
+        BUILD_ID: notset
+        BUILD_NUMBER: notset
+        JOB_NAME: notset
+        JOB_TYPE: notset
+        PULL_NUMBER: notset
+        REPO_NAME: notset
+        REPO_OWNER: notset
+        step_name: kfctl-is-ready
+        workflow: somefakename
+        workflow_template: kctl_test
+    name: kfctl-is-ready
+    workingDir: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow/testing/kfctl
+  - dag:
+      tasks:
+      - name: tfjob-test-v1
+        template: tfjob-test-v1
+      - name: tfjob-test-v1b2
+        template: tfjob-test-v1b2
+      - name: test-katib-deploy
+        template: test-katib-deploy
+      - name: pytorchjob-deploy
+        template: pytorchjob-deploy
+      - name: tfjob-simple-prototype-test
+        template: tfjob-simple-prototype-test
+      - name: notebooks-test
+        template: notebooks-test
+    name: gke-tests
+  - activeDeadlineSeconds: 3000
+    container:
+      command:
+      - pytest
+      - kfctl_delete_test.py
+      - -s
+      - --log-cli-level=info
+      - --timeout=1000
+      - --junitxml=/mnt/test-data-volume/somefakename/output/artifacts/junit_kfctl-go-delete-test.xml
+      - --app_path=/mnt/test-data-volume/somefakename/kfctl-name
+      - --kfctl_path=/mnt/test-data-volume/somefakename/src/kubeflow/kubeflow/bootstrap/bin/kfctl
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GOPATH
+        value: /mnt/test-data-volume/somefakename
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 1.5Gi
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+      workingDir: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow/testing/kfctl
+    metadata:
+      labels:
+        BUILD_ID: notset
+        BUILD_NUMBER: notset
+        JOB_NAME: notset
+        JOB_TYPE: notset
+        PULL_NUMBER: notset
+        REPO_NAME: notset
+        REPO_OWNER: notset
+        step_name: kfctl-delete
+        workflow: somefakename
+        workflow_template: kctl_test
+    name: kfctl-delete
+    workingDir: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow/testing/kfctl
+  - activeDeadlineSeconds: 3000
+    container:
+      command:
+      - python
+      - -m
+      - kubeflow.testing.prow_artifacts
+      - --artifacts_dir=/mnt/test-data-volume/somefakename/output
+      - copy_artifacts
+      - --bucket=kubeflow-ci_temp
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GOPATH
+        value: /mnt/test-data-volume/somefakename
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 1.5Gi
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+    metadata:
+      labels:
+        BUILD_ID: notset
+        BUILD_NUMBER: notset
+        JOB_NAME: notset
+        JOB_TYPE: notset
+        PULL_NUMBER: notset
+        REPO_NAME: notset
+        REPO_OWNER: notset
+        step_name: copy-artifacts
+        workflow: somefakename
+        workflow_template: kctl_test
+    name: copy-artifacts
+  - activeDeadlineSeconds: 3000
+    container:
+      command:
+      - python
+      - -m
+      - testing.run_with_retry
+      - --retries=5
+      - --
+      - rm
+      - -rf
+      - /mnt/test-data-volume/somefakename
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GOPATH
+        value: /mnt/test-data-volume/somefakename
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      resources:
+        limits:
+          cpu: "4"
+          memory: 4Gi
+        requests:
+          cpu: "1"
+          memory: 1.5Gi
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+    metadata:
+      labels:
+        BUILD_ID: notset
+        BUILD_NUMBER: notset
+        JOB_NAME: notset
+        JOB_TYPE: notset
+        PULL_NUMBER: notset
+        REPO_NAME: notset
+        REPO_OWNER: notset
+        step_name: test-dir-delete
+        workflow: somefakename
+        workflow_template: kctl_test
+    name: test-dir-delete
+  - container:
+      command:
+      - python
+      - -m
+      - kubeflow.tf_operator.simple_tfjob_tests
+      - --app_dir=/mnt/test-data-volume/somefakename/src/kubeflow/tf-operator/test/workflows
+      - --tfjob_version=v1
+      - --params=name=smoke-tfjob-gke,namespace=kubeflow
+      - --artifacts_path=/mnt/test-data-volume/somefakename/output/artifacts
+      - --skip_tests=test_simple_tfjob_gpu
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/tf-operator/py:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      metadata:
+        labels:
+          BUILD_ID: notset
+          BUILD_NUMBER: notset
+          JOB_NAME: notset
+          JOB_TYPE: notset
+          PULL_NUMBER: notset
+          REPO_NAME: notset
+          REPO_OWNER: notset
+          workflow: somefakename
+          workflow_template: kctl_test
+      name: tfjob-test-v1
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+    name: tfjob-test-v1
+  - container:
+      command:
+      - python
+      - -m
+      - kubeflow.tf_operator.simple_tfjob_tests
+      - --app_dir=/mnt/test-data-volume/somefakename/src/kubeflow/tf-operator/test/workflows
+      - --tfjob_version=v1beta2
+      - --params=name=smoke-tfjob-gke,namespace=kubeflow
+      - --artifacts_path=/mnt/test-data-volume/somefakename/output/artifacts
+      - --skip_tests=test_simple_tfjob_gpu
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/tf-operator/py:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      metadata:
+        labels:
+          BUILD_ID: notset
+          BUILD_NUMBER: notset
+          JOB_NAME: notset
+          JOB_TYPE: notset
+          PULL_NUMBER: notset
+          REPO_NAME: notset
+          REPO_OWNER: notset
+          workflow: somefakename
+          workflow_template: kctl_test
+      name: tfjob-test-v1b2
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+    name: tfjob-test-v1b2
+  - container:
+      command:
+      - python
+      - -m
+      - testing.test_deploy
+      - --project=kubeflow-ci
+      - --github_token=$(GITHUB_TOKEN)
+      - --namespace=kubeflow
+      - --test_dir=/mnt/test-data-volume/somefakename
+      - --artifacts_dir=/mnt/test-data-volume/somefakename/output/artifacts
+      - --deploy_name=test-katib
+      - --workflow_name=kfctl-go
+      - test_katib
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      metadata:
+        labels:
+          BUILD_ID: notset
+          BUILD_NUMBER: notset
+          JOB_NAME: notset
+          JOB_TYPE: notset
+          PULL_NUMBER: notset
+          REPO_NAME: notset
+          REPO_OWNER: notset
+          workflow: somefakename
+          workflow_template: kctl_test
+      name: test-katib-deploy
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+    name: test-katib-deploy
+  - container:
+      command:
+      - python
+      - -m
+      - testing.test_deploy
+      - --project=kubeflow-ci
+      - --github_token=$(GITHUB_TOKEN)
+      - --namespace=kubeflow
+      - --test_dir=/mnt/test-data-volume/somefakename
+      - --artifacts_dir=/mnt/test-data-volume/somefakename/output/artifacts
+      - --deploy_name=pytorch-job
+      - --workflow_name=kfctl-go
+      - deploy_pytorchjob
+      - --params=image=pytorch/pytorch:v0.2,num_workers=1
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py:/mnt/test-data-volume/somefakename/src/kubeflow/tf-operator/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      metadata:
+        labels:
+          BUILD_ID: notset
+          BUILD_NUMBER: notset
+          JOB_NAME: notset
+          JOB_TYPE: notset
+          PULL_NUMBER: notset
+          REPO_NAME: notset
+          REPO_OWNER: notset
+          workflow: somefakename
+          workflow_template: kctl_test
+      name: pytorchjob-deploy
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+    name: pytorchjob-deploy
+  - container:
+      command:
+      - python
+      - -m
+      - testing.tf_job_simple_test
+      - --src_dir=/mnt/test-data-volume/somefakename/src/kubeflow/kubeflow
+      - --tf_job_version=v1
+      - --test_dir=/mnt/test-data-volume/somefakename
+      - --artifacts_dir=/mnt/test-data-volume/somefakename/output/artifacts
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/tf-operator/py:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      metadata:
+        labels:
+          BUILD_ID: notset
+          BUILD_NUMBER: notset
+          JOB_NAME: notset
+          JOB_TYPE: notset
+          PULL_NUMBER: notset
+          REPO_NAME: notset
+          REPO_OWNER: notset
+          workflow: somefakename
+          workflow_template: kctl_test
+      name: tfjob-simple-prototype-test
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+    name: tfjob-simple-prototype-test
+  - container:
+      command:
+      - pytest
+      - -s
+      - jupyter_test.py
+      - --namespace=kubeflow
+      - --timeout=500
+      - --junitxml=/mnt/test-data-volume/somefakename/output/artifacts/junit_jupyter-test.xml
+      env:
+      - name: PYTHONPATH
+        value: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow:/mnt/test-data-volume/somefakename/src/kubeflow/testing/py
+      - name: GOOGLE_APPLICATION_CREDENTIALS
+        value: /secret/gcp-credentials/key.json
+      - name: GITHUB_TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: github_token
+            name: github-token
+      - name: KUBECONFIG
+        value: /mnt/test-data-volume/somefakename/kfctl_test/.kube/kubeconfig
+      image: gcr.io/kubeflow-ci/test-worker:latest
+      imagePullPolicy: Always
+      metadata:
+        labels:
+          BUILD_ID: notset
+          BUILD_NUMBER: notset
+          JOB_NAME: notset
+          JOB_TYPE: notset
+          PULL_NUMBER: notset
+          REPO_NAME: notset
+          REPO_OWNER: notset
+          workflow: somefakename
+          workflow_template: kctl_test
+      name: notebooks-test
+      volumeMounts:
+      - mountPath: /mnt/test-data-volume
+        name: kubeflow-test-volume
+      - mountPath: /secret/github-token
+        name: github-token
+      - mountPath: /secret/gcp-credentials
+        name: gcp-credentials
+      workingDir: /mnt/test-data-volume/somefakename/src/kubeflow/kubeflow/kubeflow/jupyter/tests
+    name: notebooks-test
+  ttlSecondsAfterFinished: 604800
+  volumes:
+  - name: github-token
+    secret:
+      secretName: github-token
+  - name: gcp-credentials
+    secret:
+      secretName: kubeflow-testing-credentials
+  - name: kubeflow-test-volume
+    persistentVolumeClaim:
+      claimName: nfs-external
